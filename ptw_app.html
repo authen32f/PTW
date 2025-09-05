@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PTW - Permit to Work System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Sarabun', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .gradient-bg-alt { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .card-shadow { box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-approved { background: #d1fae5; color: #065f46; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
+        .status-in-progress { background: #dbeafe; color: #1e40af; }
+        .role-disabled { opacity: 0.5; cursor: not-allowed; }
+        .floating-animation {
+            animation: float 6s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        .slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        
+        .toast {
+            background: white;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            border-left: 4px solid;
+            animation: slideInRight 0.3s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .toast.success { border-left-color: #10b981; }
+        .toast.error { border-left-color: #ef4444; }
+        .toast.warning { border-left-color: #f59e0b; }
+        .toast.info { border-left-color: #3b82f6; }
+        
+        .toast::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: currentColor;
+            animation: toastProgress 4s linear;
+        }
+        
+        .toast.success::before { background: #10b981; }
+        .toast.error::before { background: #ef4444; }
+        .toast.warning::before { background: #f59e0b; }
+        .toast.info::before { background: #3b82f6; }
+        
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes toastProgress {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+        
+        .toast-close {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 4px;
+        }
+        
+        .toast-close:hover {
+            color: #374151;
+        }
+        
+        /* Real-time indicator */
+        .realtime-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: #10b981;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .realtime-dot {
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .role-card {
+            transition: all 0.3s ease;
+            transform: scale(1);
+        }
+        .role-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+        }
+        .role-card.selected {
+            transform: scale(1.02);
+            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.3);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Login Page -->
+    <div id="login-page" class="min-h-screen gradient-bg flex items-center justify-center p-4">
+        <!-- Background Elements -->
+        <div class="absolute inset-0 overflow-hidden">
+            <div class="absolute top-10 left-10 w-20 h-20 bg-white bg-opacity-10 rounded-full floating-animation"></div>
+            <div class="absolute top-1/4 right-20 w-16 h-16 bg-white bg-opacity-10 rounded-full floating-animation" style="animation-delay: -2s;"></div>
+            <div class="absolute bottom-20 left-1/4 w-12 h-12 bg-white bg-opacity-10 rounded-full floating-animation" style="animation-delay: -4s;"></div>
+            <div class="absolute bottom-1/3 right-1/3 w-8 h-8 bg-white bg-opacity-10 rounded-full floating-animation" style="animation-delay: -1s;"></div>
+        </div>
+
+        <!-- Login Container -->
+        <div class="relative z-10 w-full max-w-6xl">
+            <!-- Header -->
+            <div class="text-center mb-12 slide-in">
+                <div class="inline-flex items-center justify-center w-24 h-24 bg-white bg-opacity-20 rounded-full mb-6 pulse-animation">
+                    <i class="fas fa-hard-hat text-4xl text-white"></i>
+                </div>
+                <h1 class="text-5xl font-bold text-white mb-4">PTW System</h1>
+                <p class="text-xl text-white text-opacity-90 mb-2">Permit to Work Management System</p>
+                <p class="text-lg text-white text-opacity-75">ระบบจัดการใบอนุญาตทำงาน</p>
+            </div>
+
+            <!-- Login Form -->
+            <div class="bg-white rounded-3xl card-shadow p-8 md:p-12 slide-in" style="animation-delay: 0.2s;">
+                <div class="text-center mb-8">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-2">เข้าสู่ระบบ</h2>
+                    <p class="text-gray-600">เลือกบทบาทของคุณเพื่อเข้าใช้งานระบบ</p>
+                </div>
+                
+                <!-- Role Selection -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <!-- Approval Host Role -->
+                    <div class="relative">
+                        <input type="radio" id="host-role" name="user-role" value="host" class="peer sr-only">
+                        <label for="host-role" id="host-role-div" class="role-card cursor-pointer block p-8 rounded-2xl border-2 border-gray-200 bg-gradient-to-br from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 peer-checked:border-purple-500 peer-checked:from-purple-100 peer-checked:to-indigo-100 transition-all">
+                            <div class="text-center">
+                                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full mb-4">
+                                    <i class="fas fa-user-shield text-2xl text-white"></i>
+                                </div>
+                                <h3 class="text-2xl font-bold text-gray-800 mb-3">Approval Host</h3>
+                                <p class="text-gray-600 mb-4 leading-relaxed">ผู้อนุญาต - มีสิทธิ์อนุมัติและปฏิเสธใบอนุญาตทำงาน</p>
+                                
+                                <!-- Status Badge -->
+                                <div class="flex justify-center mb-4">
+                                    <span id="host-status" class="px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-700">
+                                        <i class="fas fa-check-circle mr-1"></i>พร้อมใช้งาน
+                                    </span>
+                                </div>
+                                
+                                <!-- Features -->
+                                <div class="text-left space-y-2 text-sm text-gray-600">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        <span>อนุมัติ/ปฏิเสธใบอนุญาต</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        <span>ดูรายงานและสถิติ</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        <span>จัดการศูนย์อนุมัติ</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                        
+                        <!-- Current Host Info -->
+                        <div id="current-host-info" class="hidden mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+                            <div class="flex items-start text-sm text-red-800">
+                                <i class="fas fa-exclamation-triangle mr-3 text-red-500 mt-0.5"></i>
+                                <div class="flex-1">
+                                    <p class="font-semibold mb-1">ไม่สามารถเข้าใช้งานได้</p>
+                                    <p class="text-red-600 mb-2" id="current-host-name">มีผู้ใช้งานอยู่แล้ว</p>
+                                    <p class="text-xs text-red-500" id="current-host-login-time">เข้าสู่ระบบเมื่อ: --</p>
+                                    <p class="text-xs text-red-500 mt-2">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        มีเพียง 1 คนเท่านั้นที่สามารถเป็น Approval Host ได้
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Permit Applicant Role -->
+                    <div class="relative">
+                        <input type="radio" id="applicant-role" name="user-role" value="applicant" class="peer sr-only">
+                        <label for="applicant-role" class="role-card cursor-pointer block p-8 rounded-2xl border-2 border-gray-200 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 peer-checked:border-blue-500 peer-checked:from-blue-100 peer-checked:to-cyan-100 transition-all">
+                            <div class="text-center">
+                                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full mb-4">
+                                    <i class="fas fa-user-edit text-2xl text-white"></i>
+                                </div>
+                                <h3 class="text-2xl font-bold text-gray-800 mb-3">Permit Applicant</h3>
+                                <p class="text-gray-600 mb-4 leading-relaxed">ผู้ขออนุญาต - สร้างและจัดการใบอนุญาตทำงาน</p>
+                                
+                                <!-- Status Badge -->
+                                <div class="flex justify-center mb-4">
+                                    <span class="px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-700">
+                                        <i class="fas fa-users mr-1"></i>พร้อมใช้งาน (ไม่จำกัดจำนวน)
+                                    </span>
+                                </div>
+                                
+                                <!-- Features -->
+                                <div class="text-left space-y-2 text-sm text-gray-600">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        <span>สร้างใบอนุญาตใหม่</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        <span>ติดตามสถานะใบอนุญาต</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        <span>จัดการใบอนุญาตของตนเอง</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- User Info Form - Hidden -->
+                <div class="mb-8 hidden">
+                    <label class="block text-lg font-semibold text-gray-700 mb-3">
+                        <i class="fas fa-user mr-2 text-gray-500"></i>ชื่อ-นามสกุล
+                    </label>
+                    <input type="text" id="user-name-input" class="w-full px-6 py-4 text-lg border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-20 focus:border-blue-500 transition-all" placeholder="กรุณาระบุชื่อ-นามสกุลของคุณ" value="ผู้ใช้งาน">
+                </div>
+                
+                <!-- Login Button -->
+                <button onclick="selectRole()" class="w-full bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white py-4 px-8 rounded-xl text-xl font-semibold hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl">
+                    <i class="fas fa-sign-in-alt mr-3"></i>เข้าสู่ระบบ
+                </button>
+                
+                <!-- Additional Info -->
+                <div class="mt-8 text-center">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                        <div class="flex items-center justify-center">
+                            <i class="fas fa-shield-alt text-blue-500 mr-2"></i>
+                            <span>ระบบปลอดภัย</span>
+                        </div>
+                        <div class="flex items-center justify-center">
+                            <i class="fas fa-clock text-green-500 mr-2"></i>
+                            <span>ใช้งาน 24/7</span>
+                        </div>
+                        <div class="flex items-center justify-center">
+                            <i class="fas fa-mobile-alt text-purple-500 mr-2"></i>
+                            <span>รองรับทุกอุปกรณ์</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboard-page" class="hidden min-h-screen bg-gray-50">
+        <!-- Navigation for Approval Host -->
+        <nav id="host-navigation" class="gradient-bg text-white shadow-lg hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <i class="fas fa-hard-hat text-2xl mr-3"></i>
+                        <h1 class="text-xl font-bold">PTW System - Approval Host</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button onclick="showSection('dashboard')" class="hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded transition-all">
+                            <i class="fas fa-tachometer-alt mr-2"></i>หน้าหลัก
+                        </button>
+                        <button onclick="showSection('permits-list')" class="hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded transition-all">
+                            <i class="fas fa-list mr-2"></i>จัดการใบอนุญาต
+                        </button>
+                        <button onclick="showSection('approval-center')" class="hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded transition-all">
+                            <i class="fas fa-check-circle mr-2"></i>ศูนย์อนุมัติ
+                        </button>
+                        <div class="flex items-center space-x-2 bg-white bg-opacity-20 px-4 py-2 rounded-lg">
+                            <i class="fas fa-user-shield text-sm"></i>
+                            <span class="text-sm font-medium" id="host-user-name">ผู้อนุญาต</span>
+                        </div>
+                        <button onclick="releaseHostRole()" class="hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded transition-all text-yellow-200 hover:text-white">
+                            <i class="fas fa-user-times mr-2"></i>ยกเลิกการเป็นผู้อนุญาต
+                        </button>
+                        <button onclick="logout()" class="hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded transition-all">
+                            <i class="fas fa-sign-out-alt mr-2"></i>ออกจากระบบ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Navigation for Permit Applicant -->
+        <nav id="applicant-navigation" class="gradient-bg text-white shadow-lg hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <i class="fas fa-hard-hat text-2xl mr-3"></i>
+                        <h1 class="text-xl font-bold">PTW System - Permit Applicant</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button onclick="showSection('dashboard')" class="hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded transition-all">
+                            <i class="fas fa-tachometer-alt mr-2"></i>หน้าหลัก
+                        </button>
+                        <button onclick="showSection('new-permit')" class="hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded transition-all">
+                            <i class="fas fa-plus mr-2"></i>สร้างใบอนุญาต
+                        </button>
+                        <button onclick="showSection('permits-list')" class="hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded transition-all">
+                            <i class="fas fa-list mr-2"></i>จัดการใบอนุญาต
+                        </button>
+                        <div class="flex items-center space-x-2 bg-white bg-opacity-20 px-4 py-2 rounded-lg">
+                            <i class="fas fa-user-edit text-sm"></i>
+                            <span class="text-sm font-medium" id="applicant-user-name">ผู้ขออนุญาต</span>
+                        </div>
+                        <button onclick="releaseHostRole()" class="hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded transition-all text-yellow-200 hover:text-white">
+                            <i class="fas fa-user-times mr-2"></i>ยกเลิกการเป็นผู้อนุญาต
+                        </button>
+                        <button onclick="logout()" class="hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded transition-all">
+                            <i class="fas fa-sign-out-alt mr-2"></i>ออกจากระบบ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard" class="section max-w-7xl mx-auto px-4 py-8">
+            <div class="mb-8">
+                <h2 class="text-4xl font-bold text-gray-800 mb-2">Dashboard</h2>
+                <p class="text-gray-600">ภาพรวมระบบจัดการใบอนุญาตทำงาน</p>
+            </div>
+            
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl card-shadow hover:shadow-lg transition-all">
+                    <div class="flex items-center">
+                        <div class="p-4 rounded-full bg-blue-100 text-blue-600">
+                            <i class="fas fa-file-alt text-2xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm text-gray-600 font-medium">ใบอนุญาตทั้งหมด</p>
+                            <p class="text-3xl font-bold text-gray-800" id="total-permits">0</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl card-shadow hover:shadow-lg transition-all">
+                    <div class="flex items-center">
+                        <div class="p-4 rounded-full bg-yellow-100 text-yellow-600">
+                            <i class="fas fa-clock text-2xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm text-gray-600 font-medium">รออนุมัติ</p>
+                            <p class="text-3xl font-bold text-gray-800" id="pending-permits">0</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl card-shadow hover:shadow-lg transition-all">
+                    <div class="flex items-center">
+                        <div class="p-4 rounded-full bg-green-100 text-green-600">
+                            <i class="fas fa-check-circle text-2xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm text-gray-600 font-medium">อนุมัติแล้ว</p>
+                            <p class="text-3xl font-bold text-gray-800" id="approved-permits">0</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl card-shadow hover:shadow-lg transition-all">
+                    <div class="flex items-center">
+                        <div class="p-4 rounded-full bg-red-100 text-red-600">
+                            <i class="fas fa-exclamation-triangle text-2xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm text-gray-600 font-medium">หมดอายุใกล้</p>
+                            <p class="text-3xl font-bold text-gray-800" id="expiring-permits">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Permits -->
+            <div class="bg-white rounded-xl card-shadow p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">ใบอนุญาตล่าสุด</h3>
+                    <button onclick="showSection('permits-list')" class="text-blue-600 hover:text-blue-800 font-medium">
+                        ดูทั้งหมด <i class="fas fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+                <div id="recent-permits" class="space-y-4">
+                    <!-- Recent permits will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Approval Center Section (Host Only) -->
+        <div id="approval-center" class="section hidden max-w-7xl mx-auto px-4 py-8">
+            <div class="mb-8">
+                <h2 class="text-4xl font-bold text-gray-800 mb-2">ศูนย์อนุมัติ</h2>
+                <p class="text-gray-600">จัดการการอนุมัติใบอนุญาตทำงาน</p>
+            </div>
+            
+            <!-- Pending Approvals -->
+            <div class="bg-white rounded-xl card-shadow p-6 mb-8">
+                <h3 class="text-2xl font-bold text-orange-600 mb-6">
+                    <i class="fas fa-clock mr-2"></i>รออนุมัติ
+                </h3>
+                <div id="pending-approvals" class="space-y-4">
+                    <!-- Pending permits will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                    <div class="text-center">
+                        <i class="fas fa-check-circle text-4xl text-green-600 mb-4"></i>
+                        <h4 class="font-bold text-green-800 mb-2 text-lg">อนุมัติแล้ววันนี้</h4>
+                        <p class="text-3xl font-bold text-green-600" id="today-approved">0</p>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-6">
+                    <div class="text-center">
+                        <i class="fas fa-times-circle text-4xl text-red-600 mb-4"></i>
+                        <h4 class="font-bold text-red-800 mb-2 text-lg">ปฏิเสธวันนี้</h4>
+                        <p class="text-3xl font-bold text-red-600" id="today-rejected">0</p>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-6">
+                    <div class="text-center">
+                        <i class="fas fa-hourglass-half text-4xl text-blue-600 mb-4"></i>
+                        <h4 class="font-bold text-blue-800 mb-2 text-lg">เฉลี่ยเวลาอนุมัติ</h4>
+                        <p class="text-3xl font-bold text-blue-600">2.5 ชม.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Permit Section (Applicant Only) -->
+        <div id="new-permit" class="section hidden max-w-4xl mx-auto px-4 py-8">
+            <div class="mb-8">
+                <h2 class="text-4xl font-bold text-gray-800 mb-2">สร้างใบอนุญาตใหม่</h2>
+                <p class="text-gray-600">กรอกข้อมูลเพื่อขอใบอนุญาตทำงาน</p>
+            </div>
+            
+            <!-- Work Type Information -->
+            <div class="bg-white rounded-xl card-shadow p-6 mb-8">
+                <h3 class="text-2xl font-bold mb-6">ประเภทงานและคำอธิบาย</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="border-2 border-red-200 rounded-xl p-4 bg-red-50">
+                        <h4 class="font-bold text-red-600 text-lg mb-2">งานร้อน (Hot Work)</h4>
+                        <p class="text-sm text-gray-600 mb-2">งานที่มีการใช้เปลวไฟ, ประกายไฟ หรือความร้อนสูง</p>
+                        <p class="text-xs text-gray-500">ตัวอย่าง: เชื่อมโลหะ, ตัดเหล็กด้วยแก๊ส</p>
+                    </div>
+                    <div class="border-2 border-purple-200 rounded-xl p-4 bg-purple-50">
+                        <h4 class="font-bold text-purple-600 text-lg mb-2">งานในที่อับอากาศ</h4>
+                        <p class="text-sm text-gray-600 mb-2">งานในพื้นที่ระบายอากาศไม่เพียงพอ ต้องใช้ระบบช่วยหายใจ</p>
+                        <p class="text-xs text-gray-500">ตัวอย่าง: ทำความสะอาดถัง, ซ่อมบำรุงภายในถังบำบัด</p>
+                    </div>
+                    <div class="border-2 border-yellow-200 rounded-xl p-4 bg-yellow-50">
+                        <h4 class="font-bold text-yellow-600 text-lg mb-2">งานไฟฟ้า (Electrical)</h4>
+                        <p class="text-sm text-gray-600 mb-2">งานที่เกี่ยวข้องกับระบบไฟฟ้าแรงสูงหรือแรงต่ำ ต้องปฏิบัติตาม LOTO</p>
+                        <p class="text-xs text-gray-500">ตัวอย่าง: เปลี่ยนเบรกเกอร์, ติดตั้งตู้ควบคุมไฟฟ้า</p>
+                    </div>
+                    <div class="border-2 border-blue-200 rounded-xl p-4 bg-blue-50">
+                        <h4 class="font-bold text-blue-600 text-lg mb-2">งานทำงานที่สูง</h4>
+                        <p class="text-sm text-gray-600 mb-2">งานที่ความสูงเกิน 1.5 เมตร ต้องใช้ระบบป้องกันการตก</p>
+                        <p class="text-xs text-gray-500">ตัวอย่าง: ซ่อมหลังคา, ติดตั้งรางเหล็กบนโครงสร้าง</p>
+                    </div>
+                    <div class="border-2 border-green-200 rounded-xl p-4 bg-green-50 md:col-span-2">
+                        <h4 class="font-bold text-green-600 text-lg mb-2">งานสารเคมี (Chemical)</h4>
+                        <p class="text-sm text-gray-600 mb-2">งานสัมผัส จัดเก็บ หรือใช้สารเคมีอันตราย ต้องมี MSDS แนบ</p>
+                        <p class="text-xs text-gray-500">ตัวอย่าง: ล้างถังสารเคมี, ผสมสารละลาย</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Permit Form -->
+            <form id="permit-form" class="bg-white rounded-xl card-shadow p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Permit ID -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">รหัสใบอนุญาต</label>
+                        <input type="text" id="permit-id" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50" readonly>
+                    </div>
+
+                    <!-- Work Type -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">ประเภทงาน</label>
+                        <select id="work-type" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                            <option value="">เลือกประเภทงาน</option>
+                            <option value="hot-work">งานร้อน (Hot Work)</option>
+                            <option value="confined-space">งานในที่อับอากาศ</option>
+                            <option value="electrical">งานไฟฟ้า (Electrical)</option>
+                            <option value="working-at-height">งานทำงานที่สูง</option>
+                            <option value="chemical">งานสารเคมี (Chemical)</option>
+                        </select>
+                    </div>
+
+                    <!-- Start Date/Time -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">วันที่-เวลาเริ่มงาน</label>
+                        <input type="datetime-local" id="start-datetime" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+
+                    <!-- End Date/Time -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">วันที่-เวลาสิ้นสุดงาน</label>
+                        <input type="datetime-local" id="end-datetime" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+
+                    <!-- Location -->
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">สถานที่ปฏิบัติงาน</label>
+                        <select id="work-location" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                            <option value="">เลือกสถานที่</option>
+                            <option value="building-a">อาคาร A</option>
+                            <option value="building-b">อาคาร B</option>
+                            <option value="warehouse">โกดัง</option>
+                            <option value="outdoor">พื้นที่กลางแจ้ง</option>
+                            <option value="rooftop">หลังคา</option>
+                            <option value="basement">ชั้นใต้ดิน</option>
+                        </select>
+                    </div>
+
+                    <!-- Work Description -->
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">รายละเอียดและขอบเขตงาน</label>
+                        <textarea id="work-description" rows="4" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="อธิบายรายละเอียดงานที่จะทำ..." required></textarea>
+                    </div>
+
+                    <!-- PPE Requirements -->
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">อุปกรณ์ป้องกันส่วนบุคคล (PPE)</label>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
+                                <input type="checkbox" class="mr-3 text-blue-600" value="helmet">
+                                <span class="text-sm">หมวกนิรภัย</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
+                                <input type="checkbox" class="mr-3 text-blue-600" value="safety-glasses">
+                                <span class="text-sm">แว่นตานิรภัย</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
+                                <input type="checkbox" class="mr-3 text-blue-600" value="gloves">
+                                <span class="text-sm">ถุงมือ</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
+                                <input type="checkbox" class="mr-3 text-blue-600" value="safety-shoes">
+                                <span class="text-sm">รองเท้านิรภัย</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
+                                <input type="checkbox" class="mr-3 text-blue-600" value="respirator">
+                                <span class="text-sm">หน้ากากป้องกัน</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
+                                <input type="checkbox" class="mr-3 text-blue-600" value="harness">
+                                <span class="text-sm">สายรัดนิรภัย</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
+                                <input type="checkbox" class="mr-3 text-blue-600" value="coverall">
+                                <span class="text-sm">ชุดป้องกัน</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
+                                <input type="checkbox" class="mr-3 text-blue-600" value="ear-protection">
+                                <span class="text-sm">ที่ครอบหู</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 flex justify-end space-x-4">
+                    <button type="button" onclick="showSection('dashboard')" class="px-8 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-all">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" class="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 font-medium transition-all">
+                        <i class="fas fa-paper-plane mr-2"></i>ส่งใบขออนุญาต
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Permits List Section -->
+        <div id="permits-list" class="section hidden max-w-7xl mx-auto px-4 py-8">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-4xl font-bold text-gray-800 mb-2">รายการใบอนุญาต</h2>
+                    <p class="text-gray-600">จัดการและติดตามใบอนุญาตทำงาน</p>
+                </div>
+                
+                <!-- Filters -->
+                <div class="flex space-x-4">
+                    <select id="filter-status" class="px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">ทุกสถานะ</option>
+                        <option value="pending">รออนุมัติ</option>
+                        <option value="approved">อนุมัติแล้ว</option>
+                        <option value="rejected">ปฏิเสธ</option>
+                        <option value="in-progress">กำลังดำเนินการ</option>
+                    </select>
+                    
+                    <select id="filter-work-type" class="px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">ทุกประเภทงาน</option>
+                        <option value="hot-work">งานร้อน</option>
+                        <option value="confined-space">งานในที่อับอากาศ</option>
+                        <option value="electrical">งานไฟฟ้า</option>
+                        <option value="working-at-height">งานทำงานที่สูง</option>
+                        <option value="chemical">งานสารเคมี</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Permits Table -->
+            <div class="bg-white rounded-xl card-shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">รหัส</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">ประเภทงาน</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">สถานที่</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">วันที่เริ่ม</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">สถานะ</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">การดำเนินการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="permits-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Permits will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Permit Detail Modal -->
+    <div id="permit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-xl max-w-4xl w-full max-h-screen overflow-y-auto card-shadow">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-3xl font-bold text-gray-800">รายละเอียดใบอนุญาต</h3>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 p-2">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div id="permit-detail-content">
+                        <!-- Permit details will be loaded here -->
+                    </div>
+                    
+                    <!-- Approval Actions -->
+                    <div id="approval-actions" class="mt-8 border-t pt-6">
+                        <h4 class="text-xl font-bold mb-4">การอนุมัติ</h4>
+                        <div class="flex space-x-4 mb-4">
+                            <button onclick="approvePermit()" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-all">
+                                <i class="fas fa-check mr-2"></i>อนุมัติ
+                            </button>
+                            <button onclick="rejectPermit()" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-all">
+                                <i class="fas fa-times mr-2"></i>ปฏิเสธ
+                            </button>
+                        </div>
+                        <div>
+                            <textarea id="approval-comment" rows="3" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="หมายเหตุ (ถ้ามี)"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Real-time Connection Indicator -->
+    <div id="realtime-indicator" class="realtime-indicator">
+        <div class="realtime-dot"></div>
+        <span>เชื่อมต่อแบบ Real-time</span>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
+        import { getDatabase, ref, push, set, onValue, update } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBWoyJrn8zB6-YDRe9H8HsBNd6KgoxwxQM",
+            authDomain: "canva-ai-database-projec-43c5a.firebaseapp.com",
+            databaseURL: "https://canva-ai-database-projec-43c5a-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "canva-ai-database-projec-43c5a",
+            storageBucket: "canva-ai-database-projec-43c5a.firebasestorage.app",
+            messagingSenderId: "385366896316",
+            appId: "1:385366896316:web:f21c25973fac859aeceab9"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // Global variables
+        window.database = database;
+        window.ref = ref;
+        window.push = push;
+        window.set = set;
+        window.onValue = onValue;
+        window.update = update;
+        window.currentPermitId = null;
+        window.currentUserRole = null;
+        window.currentUserName = null;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            checkCurrentHost();
+            initializeOnlineUsers();
+        });
+
+        // Initialize online users tracking
+        function initializeOnlineUsers() {
+            // Track online users
+            const onlineUsersRef = ref(database, 'onlineUsers');
+            
+            // Listen for online users changes
+            onValue(onlineUsersRef, (snapshot) => {
+                const onlineUsers = snapshot.val() || {};
+                updateOnlineUsersDisplay(onlineUsers);
+            });
+        }
+
+        // Update online users display
+        function updateOnlineUsersDisplay(onlineUsers) {
+            const userCount = Object.keys(onlineUsers).length;
+            const indicator = document.getElementById('realtime-indicator');
+            
+            if (indicator) {
+                const span = indicator.querySelector('span');
+                if (span) {
+                    span.textContent = `เชื่อมต่อแบบ Real-time (${userCount} คนออนไลน์)`;
+                }
+            }
+        }
+
+        // Add user to online list when they login
+        function addUserToOnlineList(userName, role) {
+            const onlineUsersRef = ref(database, `onlineUsers/${userName.replace(/[.#$[\]]/g, '_')}`);
+            set(onlineUsersRef, {
+                name: userName,
+                role: role,
+                lastSeen: new Date().toISOString(),
+                status: 'online'
+            });
+        }
+
+        // Remove user from online list
+        function removeUserFromOnlineList(userName) {
+            const onlineUsersRef = ref(database, `onlineUsers/${userName.replace(/[.#$[\]]/g, '_')}`);
+            set(onlineUsersRef, null);
+        }
+
+        // Update user's last seen timestamp
+        function updateUserLastSeen(userName) {
+            if (userName) {
+                const userRef = ref(database, `onlineUsers/${userName.replace(/[.#$[\]]/g, '_')}`);
+                update(userRef, {
+                    lastSeen: new Date().toISOString()
+                });
+            }
+        }
+
+        // Heartbeat to keep user online
+        setInterval(() => {
+            if (window.currentUserName) {
+                updateUserLastSeen(window.currentUserName);
+            }
+        }, 30000); // Update every 30 seconds
+
+        // Check if there's a current host
+        function checkCurrentHost() {
+            const hostRef = ref(database, 'currentHost');
+            onValue(hostRef, (snapshot) => {
+                const currentHost = snapshot.val();
+                const hostRoleInput = document.getElementById('host-role');
+                const hostRoleDiv = document.getElementById('host-role-div');
+                const hostStatus = document.getElementById('host-status');
+                const currentHostInfo = document.getElementById('current-host-info');
+                
+                // Always allow host role selection - old host will be automatically replaced
+                hostRoleInput.disabled = false;
+                hostRoleDiv.className = 'role-card cursor-pointer block p-8 rounded-2xl border-2 border-gray-200 bg-gradient-to-br from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 peer-checked:border-purple-500 peer-checked:from-purple-100 peer-checked:to-indigo-100 transition-all';
+                hostStatus.innerHTML = '<i class="fas fa-check-circle mr-1"></i>พร้อมใช้งาน';
+                hostStatus.className = 'px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-700';
+                
+                // Always hide current host info
+                currentHostInfo.classList.add('hidden');
+            });
+        }
+
+        // Select role and login
+        window.selectRole = function() {
+            const selectedRole = document.querySelector('input[name="user-role"]:checked');
+            const userName = document.getElementById('user-name-input').value.trim() || 'ผู้ใช้งาน';
+            
+            if (!selectedRole) {
+                showToast('กรุณาเลือกบทบาท', 'warning');
+                return;
+            }
+            
+            // Clear old host data first
+            if (selectedRole.value === 'host') {
+                const hostRef = ref(database, 'currentHost');
+                set(hostRef, null);
+            }
+            
+            window.currentUserRole = selectedRole.value;
+            window.currentUserName = userName;
+            
+            // Add user to online list
+            addUserToOnlineList(userName, selectedRole.value);
+            
+            // Hide login page and show dashboard
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('dashboard-page').classList.remove('hidden');
+            
+            if (selectedRole.value === 'host') {
+                // Set current host in database
+                const hostRef = ref(database, 'currentHost');
+                set(hostRef, {
+                    name: userName,
+                    loginTime: new Date().toLocaleString('th-TH')
+                });
+                
+                // Show host navigation
+                document.getElementById('host-navigation').classList.remove('hidden');
+                document.getElementById('host-user-name').textContent = userName;
+                
+                showToast(`🛡️ เข้าสู่ระบบในฐานะผู้อนุญาต: ${userName}`, 'success');
+            } else {
+                // Show applicant navigation
+                document.getElementById('applicant-navigation').classList.remove('hidden');
+                document.getElementById('applicant-user-name').textContent = userName;
+                
+                showToast(`👤 เข้าสู่ระบบในฐานะผู้ขออนุญาต: ${userName}`, 'success');
+            }
+            
+            // Initialize app data
+            generatePermitId();
+            loadDashboardData();
+            loadPermitsList();
+            setupRealtimeListeners();
+            showSection('dashboard');
+        };
+
+        // Release host role function
+        window.releaseHostRole = function() {
+            if (window.currentUserRole !== 'host') {
+                alert('คุณไม่ได้เป็นผู้อนุญาตในขณะนี้');
+                return;
+            }
+            
+            if (confirm('ต้องการยกเลิกการเป็นผู้อนุญาตและกลับไปหน้า Login หรือไม่?\n\nหมายเหตุ: คนอื่นจะสามารถเข้ามาเป็นผู้อนุญาตได้ทันที')) {
+                // Remove current host from database
+                const hostRef = ref(database, 'currentHost');
+                set(hostRef, null);
+                
+                // Hide all navigations
+                document.getElementById('host-navigation').classList.add('hidden');
+                document.getElementById('applicant-navigation').classList.add('hidden');
+                
+                // Reset global variables
+                window.currentUserRole = null;
+                window.currentUserName = null;
+                
+                // Show login page and hide dashboard
+                document.getElementById('login-page').classList.remove('hidden');
+                document.getElementById('dashboard-page').classList.add('hidden');
+                
+                // Reset form and selections
+                document.getElementById('user-name-input').value = '';
+                document.querySelectorAll('input[name="user-role"]').forEach(input => input.checked = false);
+                document.querySelectorAll('.role-card').forEach(card => card.classList.remove('selected'));
+                
+                // Re-initialize host checking
+                checkCurrentHost();
+                
+                alert('ยกเลิกการเป็นผู้อนุญาตเรียบร้อยแล้ว\nตอนนี้คนอื่นสามารถเข้ามาเป็นผู้อนุญาตได้แล้ว');
+            }
+        };
+
+        // Enhanced logout function
+        window.logout = function() {
+            if (confirm('ต้องการออกจากระบบหรือไม่?')) {
+                const userName = window.currentUserName;
+                
+                if (window.currentUserRole === 'host') {
+                    // Remove current host from database
+                    const hostRef = ref(database, 'currentHost');
+                    set(hostRef, null);
+                }
+                
+                // Remove user from online list
+                if (userName) {
+                    removeUserFromOnlineList(userName);
+                }
+                
+                // Hide all navigations
+                document.getElementById('host-navigation').classList.add('hidden');
+                document.getElementById('applicant-navigation').classList.add('hidden');
+                
+                // Reset global variables
+                window.currentUserRole = null;
+                window.currentUserName = null;
+                
+                // Show login page and hide dashboard
+                document.getElementById('login-page').classList.remove('hidden');
+                document.getElementById('dashboard-page').classList.add('hidden');
+                
+                // Reset form and selections
+                document.getElementById('user-name-input').value = '';
+                document.querySelectorAll('input[name="user-role"]').forEach(input => input.checked = false);
+                document.querySelectorAll('.role-card').forEach(card => card.classList.remove('selected'));
+                
+                // Re-initialize host checking
+                checkCurrentHost();
+                
+                showToast(`👋 ออกจากระบบเรียบร้อยแล้ว`, 'info');
+            }
+        };
+
+        // Generate unique permit ID
+        function generatePermitId() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const time = String(now.getTime()).slice(-4);
+            const permitId = `PTW${year}${month}${day}${time}`;
+            if (document.getElementById('permit-id')) {
+                document.getElementById('permit-id').value = permitId;
+            }
+        }
+
+        // Setup real-time listeners with enhanced sync
+        function setupRealtimeListeners() {
+            // Listen to permits changes
+            const permitsRef = ref(database, 'permits');
+            onValue(permitsRef, (snapshot) => {
+                console.log('🔄 Real-time update: Permits data changed');
+                loadDashboardData();
+                loadPermitsList();
+                loadPendingApprovals();
+                showNotificationIfNeeded(snapshot.val());
+            });
+
+            // Listen to current host changes
+            const hostRef = ref(database, 'currentHost');
+            onValue(hostRef, (snapshot) => {
+                console.log('🔄 Real-time update: Host status changed');
+                updateHostStatus(snapshot.val());
+            });
+
+            // Listen to system notifications
+            const notificationsRef = ref(database, 'notifications');
+            onValue(notificationsRef, (snapshot) => {
+                const notifications = snapshot.val();
+                if (notifications) {
+                    handleSystemNotifications(notifications);
+                }
+            });
+        }
+
+        // Show notification for real-time updates
+        function showNotificationIfNeeded(permits) {
+            if (!permits) return;
+            
+            const permitsList = Object.values(permits);
+            const now = Date.now();
+            
+            // Check for recently updated permits (within last 5 seconds)
+            const recentUpdates = permitsList.filter(permit => {
+                const updatedAt = permit.approvedAt || permit.rejectedAt || permit.createdAt;
+                return updatedAt && (now - new Date(updatedAt).getTime()) < 5000;
+            });
+
+            recentUpdates.forEach(permit => {
+                if (permit.status === 'approved' && permit.approvedAt) {
+                    showToast(`✅ ใบอนุญาต ${permit.permitId} ได้รับการอนุมัติแล้ว`, 'success');
+                } else if (permit.status === 'rejected' && permit.rejectedAt) {
+                    showToast(`❌ ใบอนุญาต ${permit.permitId} ถูกปฏิเสธ`, 'error');
+                }
+            });
+        }
+
+        // Update host status in real-time
+        function updateHostStatus(currentHost) {
+            const hostRoleInput = document.getElementById('host-role');
+            const hostRoleDiv = document.getElementById('host-role-div');
+            const hostStatus = document.getElementById('host-status');
+            const currentHostInfo = document.getElementById('current-host-info');
+            const currentHostName = document.getElementById('current-host-name');
+            const currentHostLoginTime = document.getElementById('current-host-login-time');
+            
+            if (currentHost && currentHost.name !== window.currentUserName) {
+                // Someone else is the host
+                hostRoleInput.disabled = true;
+                hostRoleDiv.className = 'role-card role-disabled block p-8 rounded-2xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 transition-all';
+                hostStatus.innerHTML = '<i class="fas fa-user-lock mr-1"></i>ไม่พร้อมใช้งาน';
+                hostStatus.className = 'px-4 py-2 rounded-full text-sm font-medium bg-red-100 text-red-700';
+                
+                currentHostInfo.classList.remove('hidden');
+                currentHostName.textContent = `ผู้อนุญาตปัจจุบัน: ${currentHost.name}`;
+                currentHostLoginTime.textContent = `เข้าสู่ระบบเมื่อ: ${currentHost.loginTime}`;
+                
+                // Show notification if current user was kicked out
+                if (window.currentUserRole === 'host' && window.currentUserName !== currentHost.name) {
+                    showToast('⚠️ มีผู้อนุญาตคนใหม่เข้าสู่ระบบ คุณถูกออกจากระบบอัตโนมัติ', 'warning');
+                    setTimeout(() => {
+                        logout();
+                    }, 3000);
+                }
+            } else {
+                // No host or current user is the host
+                hostRoleInput.disabled = false;
+                hostRoleDiv.className = 'role-card cursor-pointer block p-8 rounded-2xl border-2 border-gray-200 bg-gradient-to-br from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 peer-checked:border-purple-500 peer-checked:from-purple-100 peer-checked:to-indigo-100 transition-all';
+                hostStatus.innerHTML = '<i class="fas fa-check-circle mr-1"></i>พร้อมใช้งาน';
+                hostStatus.className = 'px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-700';
+                currentHostInfo.classList.add('hidden');
+            }
+        }
+
+        // Handle system notifications
+        function handleSystemNotifications(notifications) {
+            Object.entries(notifications).forEach(([id, notification]) => {
+                if (!notification.read && notification.targetUser === window.currentUserName) {
+                    showToast(notification.message, notification.type);
+                    
+                    // Mark as read
+                    const notificationRef = ref(database, `notifications/${id}`);
+                    update(notificationRef, { read: true });
+                }
+            });
+        }
+
+        // Load dashboard data
+        function loadDashboardData() {
+            const permitsRef = ref(database, 'permits');
+            onValue(permitsRef, (snapshot) => {
+                const permits = snapshot.val() || {};
+                const permitsList = Object.values(permits);
+                
+                // Update stats
+                document.getElementById('total-permits').textContent = permitsList.length;
+                document.getElementById('pending-permits').textContent = permitsList.filter(p => p.status === 'pending').length;
+                document.getElementById('approved-permits').textContent = permitsList.filter(p => p.status === 'approved').length;
+                
+                // Calculate expiring permits (within 24 hours)
+                const now = new Date();
+                const expiringCount = permitsList.filter(p => {
+                    if (p.status === 'approved' && p.endDateTime) {
+                        const endDate = new Date(p.endDateTime);
+                        const timeDiff = endDate.getTime() - now.getTime();
+                        return timeDiff > 0 && timeDiff <= 24 * 60 * 60 * 1000; // 24 hours
+                    }
+                    return false;
+                }).length;
+                
+                document.getElementById('expiring-permits').textContent = expiringCount;
+                
+                // Load recent permits
+                loadRecentPermits(permitsList);
+                
+                // Update approval center stats
+                updateApprovalStats(permitsList);
+            });
+        }
+
+        // Update approval center stats
+        function updateApprovalStats(permits) {
+            const today = new Date().toDateString();
+            const todayApproved = permits.filter(p => 
+                p.status === 'approved' && 
+                p.approvedAt && 
+                new Date(p.approvedAt).toDateString() === today
+            ).length;
+            
+            const todayRejected = permits.filter(p => 
+                p.status === 'rejected' && 
+                p.rejectedAt && 
+                new Date(p.rejectedAt).toDateString() === today
+            ).length;
+            
+            if (document.getElementById('today-approved')) {
+                document.getElementById('today-approved').textContent = todayApproved;
+            }
+            if (document.getElementById('today-rejected')) {
+                document.getElementById('today-rejected').textContent = todayRejected;
+            }
+        }
+
+        // Load pending approvals for approval center
+        function loadPendingApprovals() {
+            if (window.currentUserRole !== 'host') return;
+            
+            const permitsRef = ref(database, 'permits');
+            onValue(permitsRef, (snapshot) => {
+                const permits = snapshot.val() || {};
+                const pendingPermits = Object.entries(permits)
+                    .filter(([id, permit]) => permit.status === 'pending')
+                    .map(([id, permit]) => ({...permit, id}));
+                
+                const container = document.getElementById('pending-approvals');
+                if (!container) return;
+                
+                if (pendingPermits.length === 0) {
+                    container.innerHTML = '<div class="text-center py-12"><i class="fas fa-check-circle text-6xl text-gray-300 mb-4"></i><p class="text-gray-500 text-lg">ไม่มีใบอนุญาตรออนุมัติ</p></div>';
+                    return;
+                }
+                
+                container.innerHTML = pendingPermits.map(permit => `
+                    <div class="border-2 border-orange-200 rounded-xl p-6 bg-gradient-to-r from-orange-50 to-yellow-50 hover:shadow-lg transition-all">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <h4 class="font-bold text-gray-800 text-lg mb-2">${permit.permitId}</h4>
+                                <p class="text-gray-600 mb-2">${getWorkTypeText(permit.workType)} - ${permit.workLocation}</p>
+                                <p class="text-sm text-gray-500 mb-1">ส่งคำขอเมื่อ: ${formatDateTime(permit.createdAt)}</p>
+                                <p class="text-sm text-gray-500">เริ่มงาน: ${formatDateTime(permit.startDateTime)}</p>
+                            </div>
+                            <div class="flex space-x-2 ml-4">
+                                <button onclick="viewPermitDetail('${permit.id}')" class="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-all">
+                                    <i class="fas fa-eye mr-1"></i>ดู
+                                </button>
+                                <button onclick="quickApprove('${permit.id}')" class="px-4 py-2 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 transition-all">
+                                    <i class="fas fa-check mr-1"></i>อนุมัติ
+                                </button>
+                                <button onclick="quickReject('${permit.id}')" class="px-4 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-all">
+                                    <i class="fas fa-times mr-1"></i>ปฏิเสธ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            });
+        }
+
+        // Enhanced quick approve function
+        window.quickApprove = function(permitId) {
+            if (confirm('ต้องการอนุมัติใบอนุญาตนี้หรือไม่?')) {
+                const permitRef = ref(database, `permits/${permitId}`);
+                
+                // Get permit data first to notify the applicant
+                onValue(permitRef, (snapshot) => {
+                    const permit = snapshot.val();
+                    if (permit) {
+                        update(permitRef, {
+                            status: 'approved',
+                            approvedAt: new Date().toISOString(),
+                            approvedBy: window.currentUserName
+                        }).then(() => {
+                            showToast(`✅ อนุมัติใบอนุญาต ${permit.permitId} เรียบร้อยแล้ว!`, 'success');
+                            
+                            // Notify the applicant
+                            if (permit.createdBy && permit.createdBy !== window.currentUserName) {
+                                sendNotification(permit.createdBy, 
+                                    `🎉 ใบอนุญาต ${permit.permitId} ได้รับการอนุมัติแล้ว โดย ${window.currentUserName}`, 
+                                    'success');
+                            }
+                        }).catch((error) => {
+                            showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+                        });
+                    }
+                }, { once: true });
+            }
+        };
+
+        // Enhanced quick reject function
+        window.quickReject = function(permitId) {
+            const reason = prompt('กรุณาระบุเหตุผลในการปฏิเสธ:');
+            if (reason && reason.trim()) {
+                const permitRef = ref(database, `permits/${permitId}`);
+                
+                // Get permit data first to notify the applicant
+                onValue(permitRef, (snapshot) => {
+                    const permit = snapshot.val();
+                    if (permit) {
+                        update(permitRef, {
+                            status: 'rejected',
+                            rejectedAt: new Date().toISOString(),
+                            rejectionReason: reason,
+                            rejectedBy: window.currentUserName
+                        }).then(() => {
+                            showToast(`❌ ปฏิเสธใบอนุญาต ${permit.permitId} เรียบร้อยแล้ว`, 'success');
+                            
+                            // Notify the applicant
+                            if (permit.createdBy && permit.createdBy !== window.currentUserName) {
+                                sendNotification(permit.createdBy, 
+                                    `⚠️ ใบอนุญาต ${permit.permitId} ถูกปฏิเสธ โดย ${window.currentUserName}\nเหตุผล: ${reason}`, 
+                                    'error');
+                            }
+                        }).catch((error) => {
+                            showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+                        });
+                    }
+                }, { once: true });
+            }
+        };
+
+        // Load recent permits
+        function loadRecentPermits(permits) {
+            const recentPermitsContainer = document.getElementById('recent-permits');
+            if (!recentPermitsContainer) return;
+            
+            const recentPermits = permits
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .slice(0, 5);
+            
+            if (recentPermits.length === 0) {
+                recentPermitsContainer.innerHTML = '<div class="text-center py-8"><i class="fas fa-file-alt text-4xl text-gray-300 mb-3"></i><p class="text-gray-500">ยังไม่มีใบอนุญาต</p></div>';
+                return;
+            }
+            
+            recentPermitsContainer.innerHTML = recentPermits.map(permit => `
+                <div class="flex items-center justify-between p-4 border-2 border-gray-100 rounded-xl hover:border-blue-200 hover:shadow-md transition-all">
+                    <div class="flex-1">
+                        <h4 class="font-bold text-gray-800">${permit.permitId}</h4>
+                        <p class="text-sm text-gray-600">${getWorkTypeText(permit.workType)} - ${permit.workLocation}</p>
+                        <p class="text-xs text-gray-500">${formatDateTime(permit.startDateTime)}</p>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-sm font-medium ${getStatusClass(permit.status)}">
+                        ${getStatusText(permit.status)}
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        // Load permits list
+        function loadPermitsList() {
+            const permitsRef = ref(database, 'permits');
+            onValue(permitsRef, (snapshot) => {
+                const permits = snapshot.val() || {};
+                let permitsList = Object.entries(permits).map(([id, permit]) => ({...permit, id}));
+                
+                // Filter based on user role
+                if (window.currentUserRole === 'applicant') {
+                    // Applicants can only see their own permits (in a real app, you'd filter by user ID)
+                    // For demo purposes, we'll show all permits
+                }
+                
+                displayPermitsList(permitsList);
+            });
+        }
+
+        // Display permits list
+        function displayPermitsList(permits) {
+            const tbody = document.getElementById('permits-table-body');
+            if (!tbody) return;
+            
+            if (permits.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500"><i class="fas fa-file-alt text-4xl mb-3"></i><br>ยังไม่มีใบอนุญาต</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = permits.map(permit => `
+                <tr class="hover:bg-gray-50 transition-all">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${permit.permitId}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${getWorkTypeText(permit.workType)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${permit.workLocation}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${formatDateTime(permit.startDateTime)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-3 py-1 rounded-full text-xs font-medium ${getStatusClass(permit.status)}">
+                            ${getStatusText(permit.status)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onclick="viewPermitDetail('${permit.id}')" class="text-blue-600 hover:text-blue-800 mr-4 transition-all">
+                            <i class="fas fa-eye mr-1"></i>ดู
+                        </button>
+                        ${window.currentUserRole === 'host' && permit.status === 'pending' ? `
+                            <button onclick="approvePermitFromList('${permit.id}')" class="text-green-600 hover:text-green-800 mr-4 transition-all">
+                                <i class="fas fa-check mr-1"></i>อนุมัติ
+                            </button>
+                            <button onclick="rejectPermitFromList('${permit.id}')" class="text-red-600 hover:text-red-800 transition-all">
+                                <i class="fas fa-times mr-1"></i>ปฏิเสธ
+                            </button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Utility functions
+        window.getWorkTypeText = function(workType) {
+            const types = {
+                'hot-work': 'งานร้อน',
+                'confined-space': 'งานในที่อับอากาศ',
+                'electrical': 'งานไฟฟ้า',
+                'working-at-height': 'งานทำงานที่สูง',
+                'chemical': 'งานสารเคมี'
+            };
+            return types[workType] || workType;
+        };
+
+        window.getStatusText = function(status) {
+            const statuses = {
+                'pending': 'รออนุมัติ',
+                'approved': 'อนุมัติแล้ว',
+                'rejected': 'ปฏิเสธ',
+                'in-progress': 'กำลังดำเนินการ'
+            };
+            return statuses[status] || status;
+        };
+
+        window.getStatusClass = function(status) {
+            const classes = {
+                'pending': 'status-pending',
+                'approved': 'status-approved',
+                'rejected': 'status-rejected',
+                'in-progress': 'status-in-progress'
+            };
+            return classes[status] || '';
+        };
+
+        window.formatDateTime = function(dateTimeString) {
+            const date = new Date(dateTimeString);
+            return date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', {hour: '2-digit', minute: '2-digit'});
+        };
+
+        // Toast notification system
+        window.showToast = function(message, type = 'info', duration = 4000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            toast.innerHTML = `
+                <div class="flex items-start">
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-800">${message}</p>
+                    </div>
+                    <button class="toast-close" onclick="this.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Auto remove after duration
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.style.animation = 'slideInRight 0.3s ease-out reverse';
+                    setTimeout(() => toast.remove(), 300);
+                }
+            }, duration);
+        };
+
+        // Send notification to specific user
+        function sendNotification(targetUser, message, type = 'info') {
+            const notificationsRef = ref(database, 'notifications');
+            push(notificationsRef, {
+                targetUser: targetUser,
+                message: message,
+                type: type,
+                timestamp: new Date().toISOString(),
+                read: false
+            });
+        }
+
+        // Enhanced form submission with notifications
+        if (document.getElementById('permit-form')) {
+            document.getElementById('permit-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                if (window.currentUserRole !== 'applicant') {
+                    showToast('เฉพาะผู้ขออนุญาตเท่านั้นที่สามารถสร้างใบอนุญาตได้', 'error');
+                    return;
+                }
+                
+                const formData = {
+                    permitId: document.getElementById('permit-id').value,
+                    workType: document.getElementById('work-type').value,
+                    startDateTime: document.getElementById('start-datetime').value,
+                    endDateTime: document.getElementById('end-datetime').value,
+                    workLocation: document.getElementById('work-location').value,
+                    workDescription: document.getElementById('work-description').value,
+                    status: 'pending',
+                    createdAt: new Date().toISOString(),
+                    createdBy: window.currentUserName,
+                    ppe: getPPEData()
+                };
+                
+                const permitsRef = ref(database, 'permits');
+                push(permitsRef, formData).then(() => {
+                    showToast(`📝 ส่งใบขออนุญาต ${formData.permitId} เรียบร้อยแล้ว!`, 'success');
+                    
+                    // Notify host about new permit
+                    const hostRef = ref(database, 'currentHost');
+                    onValue(hostRef, (snapshot) => {
+                        const currentHost = snapshot.val();
+                        if (currentHost && currentHost.name !== window.currentUserName) {
+                            sendNotification(currentHost.name, 
+                                `🔔 มีใบขออนุญาตใหม่: ${formData.permitId} จาก ${window.currentUserName}`, 
+                                'info');
+                        }
+                    }, { once: true });
+                    
+                    document.getElementById('permit-form').reset();
+                    generatePermitId();
+                    showSection('dashboard');
+                }).catch((error) => {
+                    showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+                });
+            });
+        }
+
+        // Get PPE data
+        function getPPEData() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        // View permit detail
+        window.viewPermitDetail = function(permitId) {
+            const permitRef = ref(database, `permits/${permitId}`);
+            onValue(permitRef, (snapshot) => {
+                const permit = snapshot.val();
+                if (permit) {
+                    window.currentPermitId = permitId;
+                    displayPermitDetail(permit);
+                    document.getElementById('permit-modal').classList.remove('hidden');
+                }
+            }, { once: true });
+        };
+
+        // Display permit detail
+        function displayPermitDetail(permit) {
+            const content = document.getElementById('permit-detail-content');
+            content.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-gray-700 mb-2">รหัสใบอนุญาต</h4>
+                        <p class="text-gray-900 text-lg">${permit.permitId}</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-gray-700 mb-2">ประเภทงาน</h4>
+                        <p class="text-gray-900">${getWorkTypeText(permit.workType)}</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-gray-700 mb-2">วันที่-เวลาเริ่มงาน</h4>
+                        <p class="text-gray-900">${formatDateTime(permit.startDateTime)}</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-gray-700 mb-2">วันที่-เวลาสิ้นสุดงาน</h4>
+                        <p class="text-gray-900">${formatDateTime(permit.endDateTime)}</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-gray-700 mb-2">สถานที่</h4>
+                        <p class="text-gray-900">${permit.workLocation}</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-gray-700 mb-2">สถานะ</h4>
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${getStatusClass(permit.status)}">
+                            ${getStatusText(permit.status)}
+                        </span>
+                    </div>
+                    <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-gray-700 mb-2">รายละเอียดงาน</h4>
+                        <p class="text-gray-900">${permit.workDescription}</p>
+                    </div>
+                    ${permit.createdBy ? `
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-bold text-gray-700 mb-2">ผู้ขออนุญาต</h4>
+                            <p class="text-gray-900">${permit.createdBy}</p>
+                        </div>
+                    ` : ''}
+                    ${permit.approvedBy ? `
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-bold text-gray-700 mb-2">ผู้อนุมัติ</h4>
+                            <p class="text-gray-900">${permit.approvedBy}</p>
+                        </div>
+                    ` : ''}
+                    ${permit.ppe && permit.ppe.length > 0 ? `
+                        <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-bold text-gray-700 mb-2">อุปกรณ์ป้องกันส่วนบุคคล</h4>
+                            <p class="text-gray-900">${permit.ppe.join(', ')}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            // Show/hide approval actions based on user role and permit status
+            const approvalActions = document.getElementById('approval-actions');
+            if (window.currentUserRole === 'host' && permit.status === 'pending') {
+                approvalActions.classList.remove('hidden');
+            } else {
+                approvalActions.classList.add('hidden');
+            }
+        }
+
+        // Enhanced approve permit from modal
+        window.approvePermit = function() {
+            if (window.currentPermitId) {
+                const comment = document.getElementById('approval-comment').value;
+                const permitRef = ref(database, `permits/${window.currentPermitId}`);
+                
+                // Get permit data first to notify the applicant
+                onValue(permitRef, (snapshot) => {
+                    const permit = snapshot.val();
+                    if (permit) {
+                        update(permitRef, {
+                            status: 'approved',
+                            approvedAt: new Date().toISOString(),
+                            approvalComment: comment,
+                            approvedBy: window.currentUserName
+                        }).then(() => {
+                            showToast(`✅ อนุมัติใบอนุญาต ${permit.permitId} เรียบร้อยแล้ว!`, 'success');
+                            
+                            // Notify the applicant
+                            if (permit.createdBy && permit.createdBy !== window.currentUserName) {
+                                sendNotification(permit.createdBy, 
+                                    `🎉 ใบอนุญาต ${permit.permitId} ได้รับการอนุมัติแล้ว โดย ${window.currentUserName}${comment ? '\nหมายเหตุ: ' + comment : ''}`, 
+                                    'success');
+                            }
+                            closeModal();
+                        }).catch((error) => {
+                            showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+                        });
+                    }
+                }, { once: true });
+            }
+        };
+
+        // Enhanced reject permit from modal
+        window.rejectPermit = function() {
+            if (window.currentPermitId) {
+                const comment = document.getElementById('approval-comment').value;
+                if (!comment.trim()) {
+                    showToast('กรุณาระบุเหตุผลในการปฏิเสธ', 'warning');
+                    return;
+                }
+                
+                const permitRef = ref(database, `permits/${window.currentPermitId}`);
+                
+                // Get permit data first to notify the applicant
+                onValue(permitRef, (snapshot) => {
+                    const permit = snapshot.val();
+                    if (permit) {
+                        update(permitRef, {
+                            status: 'rejected',
+                            rejectedAt: new Date().toISOString(),
+                            rejectionReason: comment,
+                            rejectedBy: window.currentUserName
+                        }).then(() => {
+                            showToast(`❌ ปฏิเสธใบอนุญาต ${permit.permitId} เรียบร้อยแล้ว`, 'success');
+                            
+                            // Notify the applicant
+                            if (permit.createdBy && permit.createdBy !== window.currentUserName) {
+                                sendNotification(permit.createdBy, 
+                                    `⚠️ ใบอนุญาต ${permit.permitId} ถูกปฏิเสธ โดย ${window.currentUserName}\nเหตุผล: ${comment}`, 
+                                    'error');
+                            }
+                            closeModal();
+                        }).catch((error) => {
+                            showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+                        });
+                    }
+                }, { once: true });
+            }
+        };
+
+        // Enhanced approve permit from list
+        window.approvePermitFromList = function(permitId) {
+            if (confirm('ต้องการอนุมัติใบอนุญาตนี้หรือไม่?')) {
+                const permitRef = ref(database, `permits/${permitId}`);
+                
+                // Get permit data first to notify the applicant
+                onValue(permitRef, (snapshot) => {
+                    const permit = snapshot.val();
+                    if (permit) {
+                        update(permitRef, {
+                            status: 'approved',
+                            approvedAt: new Date().toISOString(),
+                            approvedBy: window.currentUserName
+                        }).then(() => {
+                            showToast(`✅ อนุมัติใบอนุญาต ${permit.permitId} เรียบร้อยแล้ว!`, 'success');
+                            
+                            // Notify the applicant
+                            if (permit.createdBy && permit.createdBy !== window.currentUserName) {
+                                sendNotification(permit.createdBy, 
+                                    `🎉 ใบอนุญาต ${permit.permitId} ได้รับการอนุมัติแล้ว โดย ${window.currentUserName}`, 
+                                    'success');
+                            }
+                        }).catch((error) => {
+                            showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+                        });
+                    }
+                }, { once: true });
+            }
+        };
+
+        // Enhanced reject permit from list
+        window.rejectPermitFromList = function(permitId) {
+            const reason = prompt('กรุณาระบุเหตุผลในการปฏิเสธ:');
+            if (reason && reason.trim()) {
+                const permitRef = ref(database, `permits/${permitId}`);
+                
+                // Get permit data first to notify the applicant
+                onValue(permitRef, (snapshot) => {
+                    const permit = snapshot.val();
+                    if (permit) {
+                        update(permitRef, {
+                            status: 'rejected',
+                            rejectedAt: new Date().toISOString(),
+                            rejectionReason: reason,
+                            rejectedBy: window.currentUserName
+                        }).then(() => {
+                            showToast(`❌ ปฏิเสธใบอนุญาต ${permit.permitId} เรียบร้อยแล้ว`, 'success');
+                            
+                            // Notify the applicant
+                            if (permit.createdBy && permit.createdBy !== window.currentUserName) {
+                                sendNotification(permit.createdBy, 
+                                    `⚠️ ใบอนุญาต ${permit.permitId} ถูกปฏิเสธ โดย ${window.currentUserName}\nเหตุผล: ${reason}`, 
+                                    'error');
+                            }
+                        }).catch((error) => {
+                            showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+                        });
+                    }
+                }, { once: true });
+            }
+        };
+
+        // Close modal
+        window.closeModal = function() {
+            document.getElementById('permit-modal').classList.add('hidden');
+            window.currentPermitId = null;
+        };
+    </script>
+
+    <script>
+        // Show section
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionId).classList.remove('hidden');
+            
+            // Special handling for role-specific sections
+            if (sectionId === 'new-permit' && window.currentUserRole !== 'applicant') {
+                alert('เฉพาะผู้ขออนุญาตเท่านั้นที่สามารถสร้างใบอนุญาตได้');
+                showSection('dashboard');
+                return;
+            }
+            
+            if (sectionId === 'approval-center' && window.currentUserRole !== 'host') {
+                alert('เฉพาะผู้อนุญาตเท่านั้นที่สามารถเข้าถึงศูนย์อนุมัติได้');
+                showSection('dashboard');
+                return;
+            }
+        }
+
+        // Filter permits
+        document.getElementById('filter-status')?.addEventListener('change', filterPermits);
+        document.getElementById('filter-work-type')?.addEventListener('change', filterPermits);
+
+        function filterPermits() {
+            // This would be implemented to filter the permits table
+            // For now, it's a placeholder
+            console.log('Filtering permits...');
+        }
+
+        // Add role card selection animation
+        document.addEventListener('DOMContentLoaded', function() {
+            const roleInputs = document.querySelectorAll('input[name="user-role"]');
+            const roleCards = document.querySelectorAll('.role-card');
+            
+            roleInputs.forEach((input, index) => {
+                input.addEventListener('change', function() {
+                    roleCards.forEach(card => card.classList.remove('selected'));
+                    if (this.checked) {
+                        roleCards[index].classList.add('selected');
+                    }
+                });
+            });
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'972fbc38e2968955',t:'MTc1NTgzODA3OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
